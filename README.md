@@ -6,32 +6,31 @@ Full specs: [`CLAUDE.md`](./CLAUDE.md) (engineering/architecture) and [`DESIGN.m
 
 ## Status
 
-This repository is being built incrementally per `CLAUDE.md` §66 (foundation → modules → integrations → AI → queues → observability → security/perf review). It is **not yet a complete implementation of every section of `CLAUDE.md`** — see the checklist below for what's real today vs. still in progress.
+Built per `CLAUDE.md` §66 (foundation → modules → integrations → AI → queues → tests). `npm run build`, `npm run typecheck`, `npm run lint`, and `npm test` all pass clean as of this commit.
 
-**Live backend:** a real Supabase project is already provisioned and migrated (see `supabase/migrations/`) — 47 tables, RLS enabled and enforced on every tenant table, the full permission catalog seeded, storage buckets created. The app is wired to it out of the box.
+**Live backend:** a real Supabase project is provisioned and fully migrated (see `supabase/migrations/`) — 47 tables, RLS enabled and enforced on every tenant table, the full permission catalog seeded, storage buckets created. The app is wired to it out of the box.
 
-### Done
-- [x] Multi-tenant schema with `organization_id` on every tenant table, enforced via Postgres RLS (not just app-layer filtering)
-- [x] `public.has_permission()` / `public.current_org_id()` SQL functions — the same authorization used by RLS policies is callable from the app, so app-layer and DB-layer checks can't drift apart
-- [x] Full RBAC catalog (OWNER/ADMIN/MANAGER/STAFF/VIEWER + granular permission keys + per-user overrides), seeded in the DB
-- [x] Supabase Auth (email/password), session middleware, onboarding flow (create organization → become OWNER → default departments seeded)
-- [x] Design system (tokens, Card/Button/Badge/Avatar/Input/EmptyState/Skeleton primitives) + app shell (sidebar/topbar) per `DESIGN.md`
-- [x] Executive dashboard with a single aggregated `dashboard_summary()` RPC (not a dozen round-trips), recent tasks, upcoming meetings, recent activity, AI insights card
-- [x] Audit logging, encrypted-credential storage design, rate-limiting utility, security-hardened DB functions (search_path pinning, anon EXECUTE revoked on sensitive RPCs, extensions moved out of `public`)
-- [x] Storage buckets (avatars/documents/attachments/meeting-artifacts) with tenant-scoped RLS on `storage.objects`
+### Working end-to-end
+- [x] Multi-tenant schema, RLS tenant isolation on every table, RBAC (roles + granular permissions + per-user overrides), verified by an automated test that signs in as two real users in two organizations and asserts cross-tenant reads/writes are blocked (`__tests__/tenant-isolation/rls.test.ts`)
+- [x] Supabase Auth, onboarding (atomic `create_organization_and_join` RPC — see the comment in that migration for why a naive insert-then-update onboarding flow doesn't work under RLS), session middleware, audit logging, rate limiting, AES-256-GCM credential encryption
+- [x] Design system + app shell (sidebar/topbar) per `DESIGN.md`; executive dashboard backed by one aggregated `dashboard_summary()` RPC
+- [x] Employees, Departments, Teams — directory, profiles, CRUD, suspend/reactivate
+- [x] Tasks (list + Kanban, drag-and-drop, comments, subtasks, attachments) and Projects (tabbed detail: Overview/Tasks/Timeline/Files/Meetings/Team/AI)
+- [x] CRM — Customers (table/card views + activity timeline), Leads (pipeline board + convert-to-customer), Deals (pipeline board with per-stage totals) — and Support tickets (internal-note-aware thread)
+- [x] Meetings — schedule/list/detail; Google Meet + Zoom provider abstraction with OAuth connect/callback routes and encrypted token storage; idempotent meeting-sync endpoint (transcript → action item → task, never duplicated)
+- [x] AI Center — OpenAI/Google provider abstraction, cost-aware model router, permission-checked tool-calling (the AI can only do what the asking user could do), chat UI, web-research workflow, company knowledge upload
+- [x] Chat (Realtime), Notifications, Reports (charts + CSV export), Settings (organization/roles/audit-logs/billing/integrations), platform-admin area (separate `platform_admins` gate, every cross-tenant read audit-logged)
+- [x] Public API v1 (API-key auth, rate-limited), outgoing webhook delivery (HMAC-signed, exponential backoff), embeddable website widget, health checks
+- [x] BullMQ queue scaffolding + worker processes (AI research/documents, meeting summarization, webhook delivery, notification reminders) — all degrade gracefully (console warning, not a crash) when `REDIS_URL` isn't set
+- [x] Test suite: tenant isolation (network test against the live project), RBAC catalog invariants, webhook signing round-trip
 
-### In progress / scaffolded architecture, not yet wired end-to-end
-- [ ] Employees, Departments, Teams UI
-- [ ] Tasks (list/Kanban) and Projects UI
-- [ ] CRM (customers/leads/deals pipelines) and Support tickets UI
-- [ ] Meetings + Google Meet/Zoom OAuth integration and meeting-AI summarization
-- [ ] AI Center (chat with tool-calling, web research, company knowledge/RAG)
-- [ ] Internal chat (Realtime), Notifications center, Reports, Settings, Platform Admin
-- [ ] Public API (`/api/v1`), outgoing webhooks, embeddable website widget, health endpoints
-- [ ] Redis/BullMQ queues and background workers (AI, meetings, webhooks, notifications, analytics)
-- [ ] Automated test suite (tenant-isolation is the critical one — CLAUDE.md §60)
-
-The database, auth, and RBAC foundation these all depend on is real and live today; the routes/pages above are the next incremental slice per the phased build plan in `CLAUDE.md` §66.
+### Known gaps / honest limitations
+- AI chat is currently request/response, not token-streamed to the client (the tool-calling loop resolves server-side first) — CLAUDE.md's "stream the final answer" is a follow-up.
+- AI research and document-processing run **synchronously** when `SYNC_AI_RESEARCH=1` (useful without Redis configured); without it they enqueue correctly but nothing consumes the queue until a worker process (`npm run worker:ai`) is actually running somewhere.
+- Google Meet/Zoom OAuth routes and the AI providers are architecturally complete but unverified against real credentials — no OAuth app or `OPENAI_API_KEY` is configured in this environment.
+- PDF/DOCX text extraction in the document-processing worker is a documented TODO (needs `pdf-parse`/`mammoth`); plain text/Markdown works today.
+- Google inbound webhook handling is scaffolded (documented header contract) but the watch-channel registration step it depends on isn't implemented.
+- Load testing (CLAUDE.md §61) hasn't been run — no capacity claims should be made until it is.
 
 ## Tech stack
 

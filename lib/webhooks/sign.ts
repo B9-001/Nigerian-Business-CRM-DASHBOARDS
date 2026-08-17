@@ -1,4 +1,3 @@
-import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export function signPayload(secret: string, payload: string): string {

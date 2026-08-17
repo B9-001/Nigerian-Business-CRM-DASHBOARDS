@@ -14,17 +14,6 @@ export interface OnboardingState {
   error?: string
 }
 
-const DEFAULT_DEPARTMENTS = [
-  'Management',
-  'Human Resources',
-  'Finance',
-  'Marketing',
-  'Sales',
-  'Operations',
-  'Customer Service',
-  'IT',
-]
-
 function slugify(name: string) {
   return (
     name
@@ -51,35 +40,29 @@ export async function createOrganizationAction(_prev: OnboardingState, formData:
 
   const supabase = await createClient()
 
-  const { data: organization, error: orgError } = await supabase
-    .from('organizations')
-    .insert({ name: parsed.data.organizationName, slug: slugify(parsed.data.organizationName) })
-    .select('id')
-    .single()
+  // Organization creation + linking the caller's profile to it + seeding
+  // default departments happens atomically in one SECURITY DEFINER RPC
+  // (public.create_organization_and_join). Doing this as separate
+  // insert/update client calls doesn't work: the RLS SELECT policy on
+  // `organizations` requires profile.organization_id to already match,
+  // which can't be true until AFTER the profile update — PostgREST reports
+  // that chicken-and-egg gap as a generic RLS violation on the insert
+  // itself when asked to return the created row.
+  const { data: organizationId, error } = await supabase.rpc('create_organization_and_join', {
+    org_name: parsed.data.organizationName,
+    org_slug: slugify(parsed.data.organizationName),
+  })
 
-  if (orgError || !organization) {
+  if (error || !organizationId) {
     return { error: 'Could not create organization. Please try again.' }
   }
 
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .update({ organization_id: organization.id, role: 'OWNER' })
-    .eq('id', user.id)
-
-  if (profileError) {
-    return { error: 'Organization created, but we could not link your account. Contact support.' }
-  }
-
-  await supabase.from('departments').insert(
-    DEFAULT_DEPARTMENTS.map((name) => ({ organization_id: organization.id, name }))
-  )
-
   await logAuditEvent({
-    organizationId: organization.id,
+    organizationId,
     actorId: user.id,
     action: 'organization.created',
     resourceType: 'organization',
-    resourceId: organization.id,
+    resourceId: organizationId,
   })
 
   redirect('/dashboard')

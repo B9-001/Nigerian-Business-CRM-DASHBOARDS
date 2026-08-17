@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/database/supabase/admin'
+import type { Json } from '@/types/database'
 
 export interface AuditLogEntry {
   organizationId: string
@@ -26,7 +27,7 @@ export async function logAuditEvent(entry: AuditLogEntry) {
     action: entry.action,
     resource_type: entry.resourceType,
     resource_id: entry.resourceId ?? null,
-    metadata: entry.metadata ?? {},
+    metadata: (entry.metadata ?? {}) as Json,
     ip_address: entry.ipAddress ?? null,
   })
 

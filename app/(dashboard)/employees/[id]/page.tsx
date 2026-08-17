@@ -52,7 +52,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const name = `${employee.first_name} ${employee.last_name}`
   const department = employee.department as { name: string } | null
   const team = employee.team as { name: string } | null
-  const manager = employee.manager as { first_name: string; last_name: string } | null
+  const manager = employee.manager as unknown as { first_name: string; last_name: string } | null
 
   return (
     <div>

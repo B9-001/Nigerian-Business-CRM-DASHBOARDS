@@ -1,15 +1,17 @@
-import { requireOrg } from '@/lib/auth/session'
+import { requireOrg, getAllowedPermissions } from '@/lib/auth/session'
 import { createClient } from '@/lib/database/supabase/server'
-import { resolveAllowedPermissions } from '@/lib/permissions/resolve'
 import { AppShell } from '@/components/layout/app-shell'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile } = await requireOrg()
   const supabase = await createClient()
 
+  // getAllowedPermissions() is request-cached (React cache()) — any page
+  // rendered inside this layout that also calls can()/requirePermission()
+  // reuses this exact computation instead of re-querying.
   const [{ data: organization }, allowedPermissions, { count: unreadCount }] = await Promise.all([
     supabase.from('organizations').select('name').eq('id', profile.organization_id).single(),
-    resolveAllowedPermissions(supabase, profile.role, user.id),
+    getAllowedPermissions(),
     supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })

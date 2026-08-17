@@ -6,6 +6,7 @@ import { requirePermission } from '@/lib/auth/session'
 import { createClient } from '@/lib/database/supabase/server'
 import { logAuditEvent } from '@/lib/security/audit'
 import { PERMISSIONS } from '@/lib/permissions/catalog'
+import { uploadOrganizationLogo } from '@/lib/storage/org-logo'
 
 export interface SettingsActionState {
   error?: string
@@ -28,9 +29,18 @@ export async function updateOrganizationAction(_prev: SettingsActionState, formD
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid organization details' }
 
   const supabase = await createClient()
+
+  const logoFile = formData.get('logo')
+  const logoUrl = logoFile instanceof File ? await uploadOrganizationLogo(supabase, profile.organization_id, logoFile) : null
+
   const { error } = await supabase
     .from('organizations')
-    .update({ name: parsed.data.name, currency: parsed.data.currency, timezone: parsed.data.timezone })
+    .update({
+      name: parsed.data.name,
+      currency: parsed.data.currency,
+      timezone: parsed.data.timezone,
+      ...(logoUrl ? { logo_url: logoUrl } : {}),
+    })
     .eq('id', profile.organization_id)
 
   if (error) return { error: 'Could not update organization.' }

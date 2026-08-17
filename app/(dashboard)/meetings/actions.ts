@@ -28,6 +28,15 @@ const meetingSchema = z.object({
   projectId: z.string().uuid().optional().or(z.literal('')),
   customerId: z.string().uuid().optional().or(z.literal('')),
   attendeeIds: z.array(z.string().uuid()).optional(),
+  // Paste an already-generated Zoom/Google Meet link instead of having the
+  // platform create one via OAuth — e.g. the org already has a standing
+  // Zoom room, or nobody has connected the integration yet.
+  manualJoinUrl: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => !v || /^https?:\/\//i.test(v), { message: 'Meeting link must be a valid URL' }),
 })
 
 export async function createMeetingAction(_prev: MeetingActionState, formData: FormData): Promise<MeetingActionState> {
@@ -43,6 +52,7 @@ export async function createMeetingAction(_prev: MeetingActionState, formData: F
     projectId: formData.get('projectId'),
     customerId: formData.get('customerId'),
     attendeeIds: formData.getAll('attendeeIds').map(String),
+    manualJoinUrl: formData.get('manualJoinUrl'),
   })
 
   if (!parsed.success) {
@@ -55,7 +65,12 @@ export async function createMeetingAction(_prev: MeetingActionState, formData: F
   let providerMeetingId: string | null = null
   let warning: string | undefined
 
-  if (parsed.data.provider === 'GOOGLE_MEET' || parsed.data.provider === 'ZOOM') {
+  if (parsed.data.manualJoinUrl) {
+    // User pasted a link they already generated — trust it as-is, skip the
+    // provider API call entirely (no OAuth connection required).
+    joinUrl = parsed.data.manualJoinUrl
+    hostUrl = parsed.data.manualJoinUrl
+  } else if (parsed.data.provider === 'GOOGLE_MEET' || parsed.data.provider === 'ZOOM') {
     try {
       const meetingProvider = getMeetingProvider(parsed.data.provider)
       const created = await meetingProvider.createMeeting({

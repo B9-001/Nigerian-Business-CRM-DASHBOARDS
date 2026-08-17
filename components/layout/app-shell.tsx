@@ -7,6 +7,7 @@ import type { PermissionKey } from '@/lib/permissions/catalog'
 
 interface AppShellProps {
   organizationName: string
+  organizationLogoUrl?: string | null
   userName: string
   userEmail: string
   avatarUrl?: string | null
@@ -17,6 +18,7 @@ interface AppShellProps {
 
 export function AppShell({
   organizationName,
+  organizationLogoUrl,
   userName,
   userEmail,
   avatarUrl,
@@ -31,6 +33,7 @@ export function AppShell({
     <div className="flex min-h-screen bg-background">
       <Sidebar
         organizationName={organizationName}
+        organizationLogoUrl={organizationLogoUrl}
         allowedPermissions={permissionSet}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}

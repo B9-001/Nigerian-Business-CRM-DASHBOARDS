@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireUser } from '@/lib/auth/session'
 import { createClient } from '@/lib/database/supabase/server'
 import { logAuditEvent } from '@/lib/security/audit'
+import { uploadOrganizationLogo } from '@/lib/storage/org-logo'
 
 const schema = z.object({
   organizationName: z.string().min(2, 'Organization name is required'),
@@ -55,6 +56,17 @@ export async function createOrganizationAction(_prev: OnboardingState, formData:
 
   if (error || !organizationId) {
     return { error: 'Could not create organization. Please try again.' }
+  }
+
+  // Logo upload happens AFTER org creation, not before: the avatars bucket's
+  // RLS policy keys off current_org_id(), which only resolves once the RPC
+  // above has linked this user's profile to the new organization.
+  const logoFile = formData.get('logo')
+  if (logoFile instanceof File && logoFile.size > 0) {
+    const logoUrl = await uploadOrganizationLogo(supabase, organizationId, logoFile)
+    if (logoUrl) {
+      await supabase.from('organizations').update({ logo_url: logoUrl }).eq('id', organizationId)
+    }
   }
 
   await logAuditEvent({

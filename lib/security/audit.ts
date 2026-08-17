@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/database/supabase/admin'
 import type { Json } from '@/types/database'
 
 export interface AuditLogEntry {
-  organizationId: string
+  /** Null for platform-level actions that aren't scoped to a single organization (e.g. a platform admin editing a plan). */
+  organizationId: string | null
   actorId: string | null
   action: string
   resourceType: string

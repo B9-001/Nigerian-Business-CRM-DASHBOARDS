@@ -10,15 +10,15 @@ export default async function OrganizationSettingsPage() {
   const supabase = await createClient()
   const { data: organization } = await supabase
     .from('organizations')
-    .select('name, currency, timezone')
+    .select('name, currency, timezone, logo_url')
     .eq('id', profile.organization_id)
     .single()
 
   return (
     <div>
-      <PageHeader title="Organization" />
+      <PageHeader title="Organization" description="Your organization's profile, branding, and regional settings." />
       <Card>
-        <OrgForm organization={organization ?? { name: '', currency: 'NGN', timezone: 'Africa/Lagos' }} />
+        <OrgForm organization={organization ?? { name: '', currency: 'NGN', timezone: 'Africa/Lagos', logo_url: null }} />
       </Card>
     </div>
   )

@@ -9,20 +9,26 @@ import type { PermissionKey } from '@/lib/permissions/catalog'
 
 interface SidebarProps {
   organizationName: string
+  organizationLogoUrl?: string | null
   allowedPermissions: Set<PermissionKey>
   mobileOpen?: boolean
   onCloseMobile?: () => void
 }
 
-export function Sidebar({ organizationName, allowedPermissions, mobileOpen, onCloseMobile }: SidebarProps) {
+export function Sidebar({ organizationName, organizationLogoUrl, allowedPermissions, mobileOpen, onCloseMobile }: SidebarProps) {
   const pathname = usePathname()
 
   const content = (
     <div className="flex h-full flex-col bg-surface">
       <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
-          <Building2 size={16} />
-        </div>
+        {organizationLogoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={organizationLogoUrl} alt={organizationName} className="h-8 w-8 rounded-lg object-cover" />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
+            <Building2 size={16} />
+          </div>
+        )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-foreground">{organizationName}</p>
           <p className="text-[11px] text-subtle">Business OS</p>

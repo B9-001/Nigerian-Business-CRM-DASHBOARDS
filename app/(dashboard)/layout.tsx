@@ -10,7 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // rendered inside this layout that also calls can()/requirePermission()
   // reuses this exact computation instead of re-querying.
   const [{ data: organization }, allowedPermissions, { count: unreadCount }] = await Promise.all([
-    supabase.from('organizations').select('name').eq('id', profile.organization_id).single(),
+    supabase.from('organizations').select('name, logo_url').eq('id', profile.organization_id).single(),
     getAllowedPermissions(),
     supabase
       .from('notifications')
@@ -22,6 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <AppShell
       organizationName={organization?.name ?? 'Your Organization'}
+      organizationLogoUrl={organization?.logo_url}
       userName={profile.full_name ?? profile.email}
       userEmail={profile.email}
       avatarUrl={profile.avatar_url}

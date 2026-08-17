@@ -61,6 +61,14 @@ export function MeetingForm({
         </select>
       </Field>
 
+      <Field
+        label="Already have a meeting link?"
+        htmlFor="manualJoinUrl"
+        hint="Paste an existing Zoom or Google Meet link and we'll use it as-is — no need to connect an integration. Leave blank to auto-generate one via Google Meet/Zoom above (requires that integration to be connected in Settings → Integrations)."
+      >
+        <Input id="manualJoinUrl" name="manualJoinUrl" type="url" placeholder="https://meet.google.com/abc-defg-hij or https://zoom.us/j/…" />
+      </Field>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Project" htmlFor="projectId">
           <select

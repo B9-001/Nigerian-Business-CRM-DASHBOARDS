@@ -1,7 +1,9 @@
 import 'server-only'
 import OpenAI from 'openai'
-import type { AICompletionResult, AIMessage, AIProvider, AIToolCall, AIToolSchema } from './types'
-import { AIProviderNotConfiguredError } from './types'
+import type { AICompleteOptions, AICompletionResult, AIMessage, AIProvider, AIToolCall } from './types'
+import { AIProviderNotConfiguredError, AIProviderRequestError, AIProviderTimeoutError } from './types'
+import { withTimeout, DEFAULT_AI_TIMEOUT_MS } from '../timeout'
+import { logAIEvent } from '../logging'
 
 /**
  * OpenAI provider. Uses the Chat Completions API (function-calling + streaming)
@@ -31,44 +33,59 @@ export class OpenAIProvider implements AIProvider {
     })
   }
 
-  async complete(
-    messages: AIMessage[],
-    opts?: { model?: string; tools?: AIToolSchema[]; webSearch?: boolean }
-  ): Promise<AICompletionResult> {
+  async complete(messages: AIMessage[], opts?: AICompleteOptions): Promise<AICompletionResult> {
     const client = this.client()
     const model = opts?.model ?? 'gpt-4o-mini'
+    const timeoutMs = opts?.timeoutMs ?? DEFAULT_AI_TIMEOUT_MS
+    const start = Date.now()
 
     const tools: OpenAI.Chat.ChatCompletionTool[] | undefined = opts?.tools?.map((t) => ({
       type: 'function',
       function: { name: t.name, description: t.description, parameters: t.parameters },
     }))
 
-    const response = await client.chat.completions.create({
-      model,
-      messages: this.toOpenAIMessages(messages),
-      tools,
-      // Web search: if using a *-search-preview model this can be enabled;
-      // otherwise this is a no-op flag reserved for the Responses-API upgrade.
-    })
+    logAIEvent({ event: 'ai.request.start', provider: 'openai', model, workflow: 'complete' })
 
-    const choice = response.choices[0]
-    const toolCalls: AIToolCall[] = (choice?.message.tool_calls ?? []).map((tc) => ({
-      id: tc.id,
-      name: tc.function.name,
-      arguments: safeJsonParse(tc.function.arguments),
-    }))
+    try {
+      const response = await withTimeout('openai', timeoutMs, (signal) =>
+        client.chat.completions.create(
+          {
+            model,
+            messages: this.toOpenAIMessages(messages),
+            tools,
+            // Web search: if using a *-search-preview model this can be enabled;
+            // otherwise this is a no-op flag reserved for the Responses-API upgrade.
+          },
+          { signal }
+        )
+      )
 
-    return {
-      content: choice?.message.content ?? '',
-      toolCalls,
-      usage: {
-        inputTokens: response.usage?.prompt_tokens ?? 0,
-        outputTokens: response.usage?.completion_tokens ?? 0,
-      },
+      const choice = response.choices[0]
+      const toolCalls: AIToolCall[] = (choice?.message.tool_calls ?? []).map((tc) => ({
+        id: tc.id,
+        name: tc.function.name,
+        arguments: safeJsonParse(tc.function.arguments),
+      }))
+
+      const usage = { inputTokens: response.usage?.prompt_tokens ?? 0, outputTokens: response.usage?.completion_tokens ?? 0 }
+      logAIEvent({
+        event: 'ai.request.success',
+        provider: 'openai',
+        model,
+        durationMs: Date.now() - start,
+        tokensInput: usage.inputTokens,
+        tokensOutput: usage.outputTokens,
+      })
+
+      return { content: choice?.message.content ?? '', toolCalls, usage }
+    } catch (err) {
+      logAIEvent({ event: 'ai.request.error', provider: 'openai', model, durationMs: Date.now() - start, error: errorMessage(err) })
+      if (err instanceof AIProviderTimeoutError) throw err
+      throw new AIProviderRequestError('openai', errorMessage(err), err)
     }
   }
 
-  async *stream(messages: AIMessage[], opts?: { model?: string }): AsyncGenerator<string, void, unknown> {
+  async *stream(messages: AIMessage[], opts?: { model?: string; timeoutMs?: number }): AsyncGenerator<string, void, unknown> {
     const client = this.client()
     const model = opts?.model ?? 'gpt-4o-mini'
 
@@ -91,6 +108,12 @@ function safeJsonParse(input: string): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+/** Extracts a safe-to-log message — never the raw error (which can carry request headers/auth). */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message
+  return String(err)
 }
 
 export const openAIProvider = new OpenAIProvider()

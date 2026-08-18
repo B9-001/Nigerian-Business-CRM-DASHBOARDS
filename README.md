@@ -28,7 +28,8 @@ Built per `CLAUDE.md` §66 (foundation → modules → integrations → AI → q
 ### Known gaps / honest limitations
 - AI chat is currently request/response, not token-streamed to the client (the tool-calling loop resolves server-side first) — CLAUDE.md's "stream the final answer" is a follow-up.
 - AI research and document-processing run **synchronously** when `SYNC_AI_RESEARCH=1` (useful without Redis configured); without it they enqueue correctly but nothing consumes the queue until a worker process (`npm run worker:ai`) is actually running somewhere.
-- Google Meet OAuth is live-verified up to Google's consent screen but needs `http://localhost:3000/api/integrations/google/callback` (and the production equivalent) added to the OAuth client's Authorized Redirect URIs in Google Cloud Console before a real connection can complete. Zoom's OAuth screen loads without error. The AI providers' API calls are architecturally complete but unverified — no `OPENAI_API_KEY`/`GOOGLE_AI_API_KEY` is configured in this environment.
+- Google Meet OAuth is live-verified up to Google's consent screen but needs `http://localhost:3000/api/integrations/google/callback` (and the production equivalent) added to the OAuth client's Authorized Redirect URIs in Google Cloud Console before a real connection can complete. Zoom's OAuth screen loads without error.
+- AI: `OPENAI_API_KEY` is configured. `GEMINI_API_KEY` (official `@google/genai` SDK, see `lib/ai/providers/gemini.ts`) is architecturally complete and ready but not yet configured in this environment — see `docs/ai.md`.
 - Paystack billing is wired against **test-mode** keys — swap for `pk_live_`/`sk_live_` when ready for real payments; no live end-to-end checkout has been completed since that requires walking through Paystack's hosted payment page in a browser. See `docs/billing.md` "Known limitations" for the rest (no true recurring-subscription auto-charge, no PDF invoice generation, `runSubscriptionMaintenance()` not yet scheduled, MRR/churn are simple snapshots not cohort analytics).
 - PDF/DOCX text extraction in the document-processing worker is a documented TODO (needs `pdf-parse`/`mammoth`); plain text/Markdown works today.
 - Google inbound webhook handling is scaffolded (documented header contract) but the watch-channel registration step it depends on isn't implemented.
@@ -40,7 +41,7 @@ Built per `CLAUDE.md` §66 (foundation → modules → integrations → AI → q
 - **Framework:** Next.js 14 (App Router, TypeScript, Server Components/Actions)
 - **Styling:** Tailwind CSS, custom design tokens (see `DESIGN.md`)
 - **Backend:** Supabase (Postgres, Auth, Storage, Realtime), Row Level Security for tenant isolation
-- **AI:** OpenAI (Responses API) + Google AI, behind a provider abstraction (`lib/ai`)
+- **AI:** OpenAI (`openai` SDK) + Google Gemini (`@google/genai` SDK), behind a provider abstraction (`lib/ai`) — see [`docs/ai.md`](./docs/ai.md)
 - **Queues:** Redis + BullMQ (`lib/queue`, `workers/`)
 - **Validation:** Zod
 
@@ -78,7 +79,7 @@ See [`.env.example`](./.env.example) for the full list. Never expose server secr
 ## Deploying to Vercel
 
 1. Import this repository into Vercel.
-2. Set all variables from `.env.example` in the Vercel project's Environment Variables (production + preview).
+2. Set all variables from `.env.example` in the Vercel project's Environment Variables (production + preview) — this explicitly includes `OPENAI_API_KEY` and `GEMINI_API_KEY` (both server-only; never add either with a `NEXT_PUBLIC_` prefix — see `docs/ai.md`).
 3. Point `NEXT_PUBLIC_APP_URL` at the deployed domain, and update `GOOGLE_REDIRECT_URI` / `ZOOM_REDIRECT_URI` to match.
 4. Background workers (`workers/*`) are separate long-running processes — they are **not** invoked by the Next.js app itself and need to run somewhere that supports persistent processes (a small VM, Railway/Render worker, etc.), pointed at the same `REDIS_URL` and Supabase project. Deploying the web app to Vercel alone is enough to use everything that doesn't depend on a queue (auth, CRUD modules, dashboard); AI research/report generation, meeting-transcript processing, and webhook delivery need the workers running.
 

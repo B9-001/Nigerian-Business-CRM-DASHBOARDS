@@ -8,6 +8,7 @@ import type { PermissionKey } from '@/lib/permissions/catalog'
 interface AppShellProps {
   organizationName: string
   organizationLogoUrl?: string | null
+  currentPlanId?: string | null
   userName: string
   userEmail: string
   avatarUrl?: string | null
@@ -19,6 +20,7 @@ interface AppShellProps {
 export function AppShell({
   organizationName,
   organizationLogoUrl,
+  currentPlanId,
   userName,
   userEmail,
   avatarUrl,
@@ -34,6 +36,7 @@ export function AppShell({
       <Sidebar
         organizationName={organizationName}
         organizationLogoUrl={organizationLogoUrl}
+        currentPlanId={currentPlanId}
         allowedPermissions={permissionSet}
         mobileOpen={mobileNavOpen}
         onCloseMobile={() => setMobileNavOpen(false)}

@@ -15,6 +15,8 @@ import { requireOrg } from '@/lib/auth/session'
 import { createClient } from '@/lib/database/supabase/server'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { MetricCard } from '@/components/dashboard/metric-card'
+import { DonutGauge } from '@/components/dashboard/donut-gauge'
+import { AIAssistantWidget } from '@/components/dashboard/ai-assistant-widget'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
@@ -50,6 +52,9 @@ export default async function DashboardPage() {
 
   const s = (summary ?? {}) as Record<string, number>
   const firstName = (profile.full_name ?? profile.email).split(' ')[0]
+
+  const totalTaskWork = (s.tasks_open ?? 0) + (s.tasks_completed ?? 0)
+  const overallProgress = totalTaskWork > 0 ? ((s.tasks_completed ?? 0) / totalTaskWork) * 100 : 0
 
   return (
     <div>
@@ -158,6 +163,17 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
+        <Card className="flex items-center justify-center">
+          <CardContent>
+            <DonutGauge value={overallProgress} label="Overall Task Progress" sublabel={`${s.tasks_completed ?? 0} of ${totalTaskWork} tasks`} />
+          </CardContent>
+        </Card>
+
+        <AIAssistantWidget />
+      </div>
+
+      {/* Recent Activity + AI Insights */}
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
@@ -185,28 +201,27 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* AI Insights */}
-      <Card className="mt-5 border-primary-soft bg-primary-soft/40">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles size={16} className="text-primary" /> AI Insights
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {(s.tasks_overdue ?? 0) > 0
-              ? `You have ${s.tasks_overdue} overdue task${s.tasks_overdue === 1 ? '' : 's'} across the organization. `
-              : 'No overdue tasks right now — nice work. '}
-            {(s.tickets_urgent ?? 0) > 0 ? `${s.tickets_urgent} support ticket(s) are marked urgent.` : ''}
-          </p>
-          <p className="mt-2 text-xs text-subtle">AI-generated insight based on current organization data — not a guarantee.</p>
-          <Link href="/ai" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover">
-            Ask the AI Assistant <ArrowRight size={12} />
-          </Link>
-        </CardContent>
-      </Card>
+        <Card className="border-primary-soft bg-primary-soft/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles size={16} className="text-primary" /> AI Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {(s.tasks_overdue ?? 0) > 0
+                ? `You have ${s.tasks_overdue} overdue task${s.tasks_overdue === 1 ? '' : 's'} across the organization. `
+                : 'No overdue tasks right now — nice work. '}
+              {(s.tickets_urgent ?? 0) > 0 ? `${s.tickets_urgent} support ticket(s) are marked urgent.` : ''}
+            </p>
+            <p className="mt-2 text-xs text-subtle">AI-generated insight based on current organization data — not a guarantee.</p>
+            <Link href="/ai" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover">
+              Ask the AI Assistant <ArrowRight size={12} />
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

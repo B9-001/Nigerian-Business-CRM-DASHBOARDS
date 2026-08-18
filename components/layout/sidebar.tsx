@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, X } from 'lucide-react'
+import { Building2, Sparkles, X } from 'lucide-react'
 import { NAV_SECTIONS } from './nav-config'
 import { cn } from '@/lib/utils'
 import type { PermissionKey } from '@/lib/permissions/catalog'
@@ -13,9 +13,18 @@ interface SidebarProps {
   allowedPermissions: Set<PermissionKey>
   mobileOpen?: boolean
   onCloseMobile?: () => void
+  /** Shown as the sidebar upgrade CTA target; omit or pass 'ENTERPRISE' to hide it. */
+  currentPlanId?: string | null
 }
 
-export function Sidebar({ organizationName, organizationLogoUrl, allowedPermissions, mobileOpen, onCloseMobile }: SidebarProps) {
+export function Sidebar({
+  organizationName,
+  organizationLogoUrl,
+  allowedPermissions,
+  mobileOpen,
+  onCloseMobile,
+  currentPlanId,
+}: SidebarProps) {
   const pathname = usePathname()
 
   const content = (
@@ -74,6 +83,22 @@ export function Sidebar({ organizationName, organizationLogoUrl, allowedPermissi
           )
         })}
       </nav>
+
+      {allowedPermissions.has('billing.manage') && currentPlanId && currentPlanId !== 'ENTERPRISE' && (
+        <div className="p-3">
+          <Link
+            href="/settings/billing"
+            className="block rounded-card bg-primary-dark p-4 text-white transition-colors hover:bg-primary"
+          >
+            <Sparkles size={18} className="text-white/80" />
+            <p className="mt-2 text-sm font-semibold">Upgrade your plan</p>
+            <p className="mt-0.5 text-xs text-white/70">Unlock more AI usage, team seats, and advanced features.</p>
+            <span className="mt-3 inline-block rounded-control bg-white px-3 py-1.5 text-xs font-semibold text-primary-dark">
+              View plans
+            </span>
+          </Link>
+        </div>
+      )}
     </div>
   )
 

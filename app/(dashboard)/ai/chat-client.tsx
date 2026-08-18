@@ -16,16 +16,28 @@ const SUGGESTIONS = [
   'Show me our open support tickets',
 ]
 
-export function AIChatClient() {
+export function AIChatClient({ initialQuery }: { initialQuery?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | undefined>()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const autoSentRef = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Dashboard's AI Assistant widget links here with ?q=<question> — send
+  // it automatically once, so the widget feels like a real shortcut rather
+  // than just pre-filling the input.
+  useEffect(() => {
+    if (initialQuery && !autoSentRef.current) {
+      autoSentRef.current = true
+      send(initialQuery)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery])
 
   async function send(text: string) {
     if (!text.trim() || loading) return
